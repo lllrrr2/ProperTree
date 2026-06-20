@@ -729,8 +729,7 @@ class PlistWindow(tk.Toplevel):
         f_label.grid(row=0,column=0,sticky="e")
         r_label = tk.Label(self.find_frame, text="Replace:")
         r_label.grid(row=1,column=0,sticky="e")
-        self.f_options = ["Key", "Boolean", "Data", "Date", "Number", "UID", "String"]
-        self.find_type = self.f_options[0]
+        self.find_type = None
         self.f_text = EntryPlus(self.find_frame,self,self.controller)
         self.f_text.delete(0,tk.END)
         self.f_text.insert(0,"")
@@ -740,8 +739,7 @@ class PlistWindow(tk.Toplevel):
         self.r_text.insert(0,"")
         self.r_text.grid(row=1,column=2,columnspan=1,sticky="we",padx=10,pady=10)
         self.f_title = tk.StringVar(self.find_frame)
-        self.f_title.set(self.find_type)
-        f_option = tk_or_ttk.OptionMenu(self.find_frame, self.f_title, *self.controller.get_option_menu_list(self.f_options), command=self.change_find_type)
+        f_option = tk_or_ttk.OptionMenu(self.find_frame, self.f_title, *self.controller.get_option_menu_list(self.controller.f_options), command=self.change_find_type)
         f_option['menu'].insert_separator(1)
         f_option.grid(row=0,column=1)
         self.fp_button = tk_or_ttk.Button(self.find_frame,text="< Prev",width=8,command=self.find_prev)
@@ -763,7 +761,7 @@ class PlistWindow(tk.Toplevel):
             if not just_keypress:
                 for k in ("Up","Down"):
                     widget.bind("<{}-{}>".format(key,k), lambda x:self.cycle_find_type(x))
-                for i,opt in enumerate(self.f_options,start=1):
+                for i,opt in enumerate(self.controller.f_options,start=1):
                     widget.bind("<{}-Key-{}>".format(key,i), lambda x:self.set_find_type_by_index(x))
                     widget.bind("<{}-KP_{}>".format(key,i), lambda x:self.set_find_type_by_index(x))
                 widget.bind("<Return>", self.find_next)
@@ -991,9 +989,9 @@ class PlistWindow(tk.Toplevel):
             try: index = int(getattr(index,"keysym",None).replace("KP_",""))
             except: return # Borked value
         if not zero_based: index -= 1 # original index started at 1, normalize to 0-based
-        if index < 0 or index >= len(self.f_options): return # Out of range
-        self.f_title.set(self.f_options[index])
-        self.change_find_type(self.f_options[index])
+        if index < 0 or index >= len(self.controller.f_options): return # Out of range
+        self.f_title.set(self.controller.f_options[index])
+        self.change_find_type(self.controller.f_options[index])
         return "break" # Prevent the keypress from cascading
 
     def change_find_type(self, value):
@@ -1005,7 +1003,7 @@ class PlistWindow(tk.Toplevel):
         if increment is None: return # Not sure why this was fired?
         # Set our type to the next in the list
         value = self.f_title.get()
-        try: curr,end = self.f_options.index(value),len(self.f_options)
+        try: curr,end = self.controller.f_options.index(value),len(self.controller.f_options)
         except: return # Menu is janked?
         mod = 1 if increment else -1
         # Return set_find_type_by_index's return to prevent keypress cascading as needed
@@ -1135,6 +1133,13 @@ class PlistWindow(tk.Toplevel):
                 self._tree.focus_force()
 
     def hide_show_find(self, event=None, override=None):
+        # Ensure that we default to what's in the settings if we haven't
+        # shown this panel yet
+        if self.find_type is None:
+            # Not set yet - let's set it
+            self.find_type = self.controller.find_type_string.get()
+            self.f_title.set(self.find_type)
+
         if event and override is None and self.show_find_replace \
         and not str(event.widget.focus_get()).startswith(str(self.find_frame)):
             # We got a non-overridden ctrl/cmd-f event triggered from somewhere
